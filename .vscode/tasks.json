@@ -1,0 +1,20 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "dotnet",
+			"task": "build /Users/gotojo/work/CS/test/test.csproj",
+			"file": "/Users/gotojo/work/CS/test/test.csproj",
+			"group": "build",
+			"problemMatcher": [],
+			"label": "dotnet: build /Users/gotojo/work/CS/test/test.csproj"
+		},
+		{
+			"type": "dotnet",
+			"task": "build",
+			"group": "build",
+			"problemMatcher": [],
+			"label": "dotnet: build"
+		}
+	]
+}
