@@ -9,13 +9,22 @@ using System.Runtime.CompilerServices;
 using System.Diagnostics;
 public class SMFPlayer
 {
-	public static UInt32 tempo = 120;
-	private bool isValid = false;
 	private UInt16 format = 0;
+	public UInt32 tempo = 120;
+	public UInt32 tpqn = 96;
+	public float usecPerQuarterNote = 60000000 / 120;
+	public bool isValid = false;
 	private UInt16 nTracks = 0;
-	private List<Track> tracks = new List<Track>();
+	private List<TrackData> tracks = new List<TrackData>();
+	private List<TrackPlayer> players = new List<TrackPlayer>();
 	private MIDIHandler midiHandler;
 	private bool playing = false;
+	public struct Beat
+	{
+		public int unit;
+		public int count;
+	};
+	public Beat beat;
 
 	public static UInt32 BEReader(BinaryReader reader, int len)
 	{
@@ -41,34 +50,39 @@ public class SMFPlayer
 		this.midiHandler = midiHandler;
 		isValid = true;
 		tracks.Clear();
+		players.Clear();
 		// Console.WriteLine("Loading SMF: " + filepath);
 		// Console.WriteLine(filepath);
 		using (FileStream fs = new FileStream(filepath, FileMode.Open, FileAccess.Read))
 		{
 			BinaryReader reader = new BinaryReader(fs);
 			isValid = ParseChunk(reader);
+			foreach (TrackData track in tracks) {
+				TrackPlayer player = new TrackPlayer(track, this, midiHandler);
+				players.Add(player);
+			}
 		}
+		// Console.WriteLine("complete parsing SMF");
 	}
 	public void Reset()
 	{
-		foreach (Track track in tracks){
-			track.Reset();
+		beat.count = 4;
+		beat.unit = 4; // default is 4 / 4
+		foreach (TrackPlayer player in players){
+			player.Reset();
 		}
 	}
-	public bool isPlay() {
+	public bool isPlaying() {
 		return this.playing;
 	}
 	private UInt32 tickup() {
 		UInt32 nexttime = UInt32.MaxValue;
-		foreach (Track track in tracks)
-		{
-			if (track.isEnd)
-			{
+		foreach (TrackPlayer player in players) {
+			if (player.isEnd) {
 				continue;
 			}
-			UInt32 _nexttime = track.Tickup();
-			if (_nexttime < nexttime)
-			{
+			UInt32 _nexttime = player.Tickup();
+			if (_nexttime < nexttime) {
 				nexttime = _nexttime;
 			}
 		}
@@ -76,6 +90,7 @@ public class SMFPlayer
 	}
 	public bool Play()
 	{
+		// Console.WriteLine("Play Start");
 		if (!isValid) {
 			return false;
 		}
@@ -88,7 +103,7 @@ public class SMFPlayer
 		if (nexttime == UInt32.MaxValue) {
 			playing = false;
 		}
-		UInt32 nextEventTime = nexttime / 1000 + startTime;
+		UInt32 nextEventTime = nexttime + startTime;
 		// Console.WriteLine($"nextEventTime: {nextEventTime}");
 		Task.Run(async () =>
 		{
@@ -101,10 +116,12 @@ public class SMFPlayer
 						playing = false;
 						break;
 					}
-					nextEventTime = nexttime / 1000 + startTime;
+					nextEventTime = nexttime + startTime;
 					// Console.WriteLine($"currentTime: {currentTime}, nextEventTime: {nextEventTime}");
 				}
-				await Task.Delay(100);
+				UInt32 delay =(UInt32)(usecPerQuarterNote / 1000 / 4);
+				// Console.WriteLine($"wait {delay}ms");
+				await Task.Delay((int)delay);
 			};
 			stopWatch.Stop();
 		});
@@ -133,9 +150,9 @@ public class SMFPlayer
 				break;
 			case "MTrk":
 				// Console.WriteLine("Track Chunk");
-				Track track = new Track(trackid, reader, this.midiHandler);
-				if (track.isValid) {
-					tracks.Add(track);
+				TrackParser parser = new TrackParser(trackid, reader, this);
+				if (parser.isValid) {
+					tracks.Add(parser);
 					trackid++;
 				}
 				break;
@@ -157,76 +174,125 @@ public class SMFPlayer
 		}
 		format = (UInt16)BEReader(reader, 2);
 		nTracks = (UInt16)BEReader(reader, 2);
-		Track.tpqn = (UInt16)BEReader(reader, 2);
+		tpqn = (UInt16)BEReader(reader, 2);
 		return true;
 	}
 
-	class Track {
-		public int id;
-		public UInt32 size;
-		public bool isValid = true;
-		public bool isEnd = false;
-		public static UInt32 tpqn = 96;
-		private byte runningStatus = 0;
-		private UInt32 currentTick = 0;
-		private int currentEventIndex = 0;
-		private UInt32 nextEventTick = 0;
-		private UInt32 nextEventUsec = 0;
-		private static UInt32 usecPerQuarterNote = 60000000 / 120;
-
-		private struct MIDIEvent {
-			public UInt32	deltaTime;
-			public byte[]	data;
-			public UInt32	usec;
+	class TrackData {
+		private int id;
+		private SMFPlayer player;
+		private bool isEnd;
+		public struct MIDIEvent
+		{
+			public UInt32 deltaTime;
+			public byte[] data;
+			public UInt32 msec;
 		};
 		private List<MIDIEvent> midiEvents = new List<MIDIEvent>();
-		private MIDIHandler midiHandler;
+		private UInt32 currentEventIndex = 0;
+		private UInt32 currentTime = 0;
 
-		public Track(int num, BinaryReader reader, MIDIHandler handler) {
-			id = num;
-			midiHandler = handler;
+		public TrackData(int trackid, SMFPlayer player)
+		{
+			id = trackid;
+			this.player = player;
 			Reset();
+		}
+		public void Clear()
+		{
+			Reset();
+			midiEvents.Clear();
+		}
+		public bool Add(UInt32 deltaTime, byte[] data)
+		{
+			UInt32 deltaMSec = (UInt32)(deltaTime * player.usecPerQuarterNote / player.tpqn / 1000);
+			MIDIEvent midiEvent = new MIDIEvent();
+			if (deltaMSec >= (UInt32.MaxValue - currentTime)) {
+				midiEvent.deltaTime = UInt32.MaxValue;
+				midiEvent.data = null;
+				midiEvent.msec = UInt32.MaxValue;
+				midiEvents.Add(midiEvent);
+				return false;
+			}
+			midiEvent.deltaTime = deltaTime;
+			midiEvent.data = data;
+			currentTime += deltaMSec;
+			midiEvent.msec = currentTime;
+			midiEvents.Add(midiEvent);
+			return true;
+		}
+		public void Reset() {
+			currentEventIndex = 0;
+			currentTime = 0;
+			isEnd = false;
+		}
+		public bool Next() {
+			UInt32 index = currentEventIndex + 1;
+			if (index >= midiEvents.Count) {
+				isEnd = true;
+				return false;
+			}
+			currentEventIndex = index;
+			return true;
+		}
+		public UInt32 GetDeltaTime()
+		{
+			return midiEvents[(int)currentEventIndex].deltaTime;
+		}
+		public byte[] GetData()
+		{
+			return midiEvents[(int)currentEventIndex].data;
+		}
+		public UInt32 GetMsec()
+		{
+			return midiEvents[(int)currentEventIndex].msec;
+		}
+		public bool IsEnd()
+		{
+			return isEnd;
+		}
+	};
+
+	class TrackParser : TrackData {
+		public bool isValid = true;
+		public bool isEnd = false;
+		private SMFPlayer smfPlayer;
+		private byte runningStatus = 0;
+		public TrackParser(int trackid, BinaryReader reader, SMFPlayer player):base(trackid, player) {
+			smfPlayer = player;
+			runningStatus = 0;
 			UInt32 size = SMFPlayer.BEReader(reader, 4);
-			this.size = size;
 			if (size == 0) {
 				isValid = false;
 				return;
 			}
+			Clear();
 			byte[] data = new byte[size];
 			reader.Read(data, 0, (int)size);
 			long endPosition = reader.BaseStream.Position + size;
 			BinaryReader bufferReader = new BinaryReader(new MemoryStream(data));
 			ParseBody(bufferReader, endPosition);
 		}
-		public void Reset() {
-			isEnd = false;
-			currentEventIndex = 0;
-			nextEventTick = (midiEvents.Count > 0) ? midiEvents[currentEventIndex].deltaTime : 0;
-			nextEventUsec = 0;
-			runningStatus = 0;
-			currentTick = 0;
-		}
-		private void ParseBody(BinaryReader reader, long endPosition) {
-			UInt32 time = 0;
+		private void ParseBody(BinaryReader reader, long endPosition)
+		{
 			while (reader.BaseStream.Position < endPosition) {
 				UInt32 deltaTime = ParseDeltaTime(reader);
 				// Console.WriteLine($"deltaTime: {deltaTime}");
 				byte[] eventData = ParseEvent(reader);
-				MIDIEvent midiEvent = new MIDIEvent();
-				midiEvent.deltaTime = deltaTime;
-				midiEvent.data = eventData;
-				time += deltaTime * Track.usecPerQuarterNote / tpqn;
-				midiEvent.usec = time;
-				midiEvents.Add(midiEvent);
+				if (!Add(deltaTime, eventData)) {
+					break;
+				}
 				if (isEnd) {
 					break;
 				}
 			}
 		}
-		private UInt32 ParseDeltaTime(BinaryReader reader) {
+		private UInt32 ParseDeltaTime(BinaryReader reader)
+		{
 			return ParseVariableLength(reader);
 		}
-		private UInt32 ParseVariableLength(BinaryReader reader) {
+		private UInt32 ParseVariableLength(BinaryReader reader)
+		{
 			UInt32 value = 0;
 			byte b;
 			do {
@@ -235,7 +301,8 @@ public class SMFPlayer
 			} while ((b & 0x80) != 0);
 			return value;
 		}
-		private byte[] ParseEvent(BinaryReader reader) {
+		private byte[] ParseEvent(BinaryReader reader)
+		{
 			byte status = reader.ReadByte();
 			if (status < 0x80) {
 				// Running Status
@@ -245,88 +312,114 @@ public class SMFPlayer
 				runningStatus = status;
 			}
 			switch (status) {
-			case 0xFF:
-				// Meta Event
-				byte metaType = reader.ReadByte();
-				UInt32 size = ParseVariableLength(reader);
-				byte[] metaData = new byte[size + 2];
-				metaData[0] = status;
-				metaData[1] = metaType;
-				reader.Read(metaData, 2, (int)size);
-				if (metaType == 0x2F) {
-					// End of Track
-					isEnd = true;
-				} else if (metaType == 0x51) {
-					UInt32 usecPerQuarterNote = (UInt32)(metaData[2] << 16 | metaData[3] << 8 | metaData[4]);
-					usecPerQuarterNote &= 0x00FFFFFF;
-					SMFPlayer.tempo = 60000000 / usecPerQuarterNote;
-					Track.usecPerQuarterNote = usecPerQuarterNote;
-					// Console.WriteLine("Tempo: " + tempo);
-				}
-				return metaData;
-			case 0xF0:
-			case 0xF7:
-				// SysEx Event
-				UInt32 sysexSize = ParseVariableLength(reader);
-				byte[] sysexData = new byte[sysexSize + 1];
-				sysexData[0] = status;
-				reader.Read(sysexData, 1, (int)sysexSize);
-				return sysexData;
-			case 0x80:
-			case 0x90:
-			case 0xE0:
-				// 3byte events
-				byte[] data3 = new byte[3];
-				data3[0] = status;
-				data3[1] = reader.ReadByte();
-				data3[2] = reader.ReadByte();
-				return data3;
-			case 0xA0:
-			case 0xB0:
-			case 0xC0:
-			case 0xD0:
-				// 2byte events
-				byte[] data2 = new byte[2];
-				data2[0] = status;
-				data2[1] = reader.ReadByte();
-				return data2;
-			default:
-				// Unknown event
-				// Console.WriteLine("Unknown Event");
-				byte[] unknownData = new byte[1];
-				unknownData[0] = status;
-				return unknownData;
+				case 0xFF:
+					// Meta Event
+					byte metaType = reader.ReadByte();
+					UInt32 size = ParseVariableLength(reader);
+					byte[] metaData = new byte[size + 2];
+					metaData[0] = status;
+					metaData[1] = metaType;
+					reader.Read(metaData, 2, (int)size);
+					if (metaType == 0x2F) {
+						// End of Track
+						isEnd = true;
+					} else if (metaType == 0x51) {
+						UInt32 usecPerQuarterNote = (UInt32)(metaData[2] << 16 | metaData[3] << 8 | metaData[4]);
+						usecPerQuarterNote &= 0x00FFFFFF;
+						smfPlayer.tempo = 60000000 / usecPerQuarterNote;
+						smfPlayer.usecPerQuarterNote = (float)usecPerQuarterNote;
+						// Console.WriteLine("Tempo: " + smfPlayer.tempo);
+					} else if (metaType == 0x58) {
+						// Time Signature
+						smfPlayer.beat.count = metaData[2];
+						smfPlayer.beat.unit = 2 ^ metaData[3];
+						// Console.WriteLine($"Beat:  {smfPlayer.beat.count} / {smfPlayer.beat.unit}");
+					}
+					return metaData;
+				case 0xF0:
+				case 0xF7:
+					// SysEx Event
+					UInt32 sysexSize = ParseVariableLength(reader);
+					byte[] sysexData = new byte[sysexSize + 1];
+					sysexData[0] = status;
+					reader.Read(sysexData, 1, (int)sysexSize);
+					return sysexData;
+				case 0x80:
+				case 0x90:
+				case 0xE0:
+					// 3byte events
+					byte[] data3 = new byte[3];
+					data3[0] = status;
+					data3[1] = reader.ReadByte();
+					data3[2] = reader.ReadByte();
+					return data3;
+				case 0xA0:
+				case 0xB0:
+				case 0xC0:
+				case 0xD0:
+					// 2byte events
+					byte[] data2 = new byte[2];
+					data2[0] = status;
+					data2[1] = reader.ReadByte();
+					return data2;
+				default:
+					// Unknown event
+					// Console.WriteLine("Unknown Event");
+					byte[] unknownData = new byte[1];
+					unknownData[0] = status;
+					return unknownData;
 			}
+		}
+	};
+
+	class TrackPlayer {
+		public bool isEnd = false;
+		private TrackData midiEvents;
+		private SMFPlayer smfPlayer;
+		private MIDIHandler midiHandler;
+		private UInt32 currentTick = 0;
+		private int currentEventIndex = 0;
+		private UInt32 nextEventTick = 0;
+		private UInt32 nextEventMsec = 0; 
+		public TrackPlayer(TrackData data, SMFPlayer player, MIDIHandler handler) {
+			midiEvents = data;
+			smfPlayer = player;
+			midiHandler = handler;
+		}
+		public void Reset()
+		{
+			midiEvents.Reset();
+			isEnd = false;
+			nextEventTick = midiEvents.GetDeltaTime();
+			nextEventMsec = midiEvents.GetMsec();
+			currentTick = 0;
 		}
 		public UInt32 Tickup()
 		{
 			if (isEnd) {
-				return uint.MaxValue;
+				return UInt32.MaxValue;
 			}
-			if (currentEventIndex >= midiEvents.Count) {
-				return uint.MaxValue;
+			currentTick += 1;
+			if (midiEvents.IsEnd()) {
+				isEnd = true;
+				return UInt32.MaxValue;
 			}
 			while (currentTick >= nextEventTick) {
-				MIDIEvent _midiEvent = midiEvents[currentEventIndex];
-				// Console.WriteLine($"usec:{_midiEvent.usec}");
-				DoMIDIEvent(_midiEvent.data);
-				currentEventIndex++;
-				if (currentEventIndex < midiEvents.Count) {
-					nextEventTick = currentTick + midiEvents[currentEventIndex].deltaTime;
-					nextEventUsec = midiEvents[currentEventIndex].usec;
-					// Console.WriteLine($"currentTick: {currentTick}, nextEventTick:{nextEventTick}, usec:{_midiEvent.usec}");
-				}
-				else {
-					nextEventTick = uint.MaxValue;
-					nextEventUsec = uint.MaxValue;
+				DoMIDIEvent(midiEvents.GetData());
+				if (!midiEvents.Next()) {
+					nextEventTick = UInt32.MaxValue;
+					nextEventMsec = UInt32.MaxValue;
 					isEnd = true;
 					break;
 				}
+				nextEventTick = currentTick + midiEvents.GetDeltaTime();
+				nextEventMsec = midiEvents.GetMsec();
+				// Console.WriteLine($"currentTick: {currentTick}, nextEventTick:{nextEventTick}, nextEventMsec:{nextEventMsec}");
 			}
-			currentTick++;
-			return nextEventUsec;
+			return nextEventMsec;
 		}
-		private string GetMetaText(byte[] data) {
+		private string GetMetaText(byte[] data)
+		{
 			String text = System.Text.Encoding.UTF8.GetString(data, 2, data.Length - 2);
 			return text;
 		}
@@ -334,15 +427,20 @@ public class SMFPlayer
 		{
 			if (data[0] == 0xFF) {
 				// Meta Event
-				switch (data[1])
-				{
+				switch (data[1]) {
 					case 0x51:
 						// Set Tempo
 						UInt32 usecPerQuarterNote = (UInt32)(data[2] << 16 | data[3] << 8 | data[4]);
 						usecPerQuarterNote &= 0x00FFFFFF;
-						SMFPlayer.tempo = 60000000 / usecPerQuarterNote;
-						Track.usecPerQuarterNote = usecPerQuarterNote;
-						// Console.WriteLine("Tempo: " + tempo);
+						smfPlayer.tempo = 60000000 / usecPerQuarterNote;
+						smfPlayer.usecPerQuarterNote = usecPerQuarterNote;
+						// Console.WriteLine("Tempo: " + smfPlayer.tempo);
+						break;
+					case 0x58:
+						// Time Signature
+						smfPlayer.beat.count = data[2];
+						smfPlayer.beat.unit = 2 ^ data[3];
+						// Console.WriteLine($"Beat:  {smfPlayer.beat.count} / {smfPlayer.beat.unit}");
 						break;
 					case 0x2F:
 						// End of Track
@@ -363,6 +461,5 @@ public class SMFPlayer
 				midiHandler.MIDIIn(data);
 			}
 		}
-	}
-
+	};
 }

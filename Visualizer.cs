@@ -26,6 +26,6 @@ public class Visualizer
 
     public void LyricIn(string lyric)
     {
-        // Console.WriteLine(lyric);
+        Console.WriteLine(lyric);
     }
 }
