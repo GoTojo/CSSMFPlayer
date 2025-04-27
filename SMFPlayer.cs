@@ -58,7 +58,7 @@ public class SMFPlayer
 			BinaryReader reader = new BinaryReader(fs);
 			isValid = ParseChunk(reader);
 			foreach (TrackData track in tracks) {
-				TrackPlayer player = new TrackPlayer(track, this, midiHandler);
+				TrackPlayer player = new TrackPlayer(track, this);
 				players.Add(player);
 			}
 		}
@@ -150,7 +150,7 @@ public class SMFPlayer
 				break;
 			case "MTrk":
 				// Console.WriteLine("Track Chunk");
-				TrackParser parser = new TrackParser(trackid, reader, this);
+				TrackParser parser = new TrackParser(trackid, reader, this, midiHandler);
 				if (parser.isValid) {
 					tracks.Add(parser);
 					trackid++;
@@ -163,6 +163,9 @@ public class SMFPlayer
 				break;
 			}
 		} while (reader.BaseStream.Position < reader.BaseStream.Length);
+		BeatTrack beatTrack = new BeatTrack(trackid, tracks, this, midiHandler);
+		tracks.Add(beatTrack);
+		trackid++;
 		return true;
 	}
 
@@ -181,14 +184,14 @@ public class SMFPlayer
 	class TrackData {
 		private int id;
 		private SMFPlayer player;
-		private bool isEnd;
+		protected bool isEnd;
 		public struct MIDIEvent
 		{
 			public UInt32 deltaTime;
 			public byte[] data;
 			public UInt32 msec;
 		};
-		private List<MIDIEvent> midiEvents = new List<MIDIEvent>();
+		protected List<MIDIEvent> midiEvents = new List<MIDIEvent>();
 		private UInt32 currentEventIndex = 0;
 		private UInt32 currentTime = 0;
 
@@ -221,7 +224,7 @@ public class SMFPlayer
 			midiEvents.Add(midiEvent);
 			return true;
 		}
-		public void Reset() {
+		public virtual void Reset() {
 			currentEventIndex = 0;
 			currentTime = 0;
 			isEnd = false;
@@ -237,19 +240,34 @@ public class SMFPlayer
 		}
 		public UInt32 GetDeltaTime()
 		{
+			if (midiEvents.Count() <= currentEventIndex) {
+				return UInt32.MaxValue;
+			}
 			return midiEvents[(int)currentEventIndex].deltaTime;
 		}
 		public byte[] GetData()
 		{
+			if (midiEvents.Count() <= currentEventIndex) {
+				byte[] dummy = new byte[0];
+				return dummy;
+			}
 			return midiEvents[(int)currentEventIndex].data;
 		}
 		public UInt32 GetMsec()
 		{
+			if (midiEvents.Count() <= currentEventIndex) {
+				return UInt32.MaxValue;
+			}
 			return midiEvents[(int)currentEventIndex].msec;
 		}
 		public bool IsEnd()
 		{
 			return isEnd;
+		}
+
+		public virtual void DoEvent()
+		{
+
 		}
 	};
 
@@ -258,7 +276,8 @@ public class SMFPlayer
 		public bool isEnd = false;
 		private SMFPlayer smfPlayer;
 		private byte runningStatus = 0;
-		public TrackParser(int trackid, BinaryReader reader, SMFPlayer player):base(trackid, player) {
+		private MIDIHandler midiHandler;
+		public TrackParser(int trackid, BinaryReader reader, SMFPlayer player, MIDIHandler handler):base(trackid, player) {
 			smfPlayer = player;
 			runningStatus = 0;
 			UInt32 size = SMFPlayer.BEReader(reader, 4);
@@ -266,6 +285,7 @@ public class SMFPlayer
 				isValid = false;
 				return;
 			}
+			midiHandler = handler;
 			Clear();
 			byte[] data = new byte[size];
 			reader.Read(data, 0, (int)size);
@@ -370,61 +390,14 @@ public class SMFPlayer
 					return unknownData;
 			}
 		}
-	};
-
-	class TrackPlayer {
-		public bool isEnd = false;
-		private TrackData midiEvents;
-		private SMFPlayer smfPlayer;
-		private MIDIHandler midiHandler;
-		private UInt32 currentTick = 0;
-		private int currentEventIndex = 0;
-		private UInt32 nextEventTick = 0;
-		private UInt32 nextEventMsec = 0; 
-		public TrackPlayer(TrackData data, SMFPlayer player, MIDIHandler handler) {
-			midiEvents = data;
-			smfPlayer = player;
-			midiHandler = handler;
-		}
-		public void Reset()
-		{
-			midiEvents.Reset();
-			isEnd = false;
-			nextEventTick = midiEvents.GetDeltaTime();
-			nextEventMsec = midiEvents.GetMsec();
-			currentTick = 0;
-		}
-		public UInt32 Tickup()
-		{
-			if (isEnd) {
-				return UInt32.MaxValue;
-			}
-			currentTick += 1;
-			if (midiEvents.IsEnd()) {
-				isEnd = true;
-				return UInt32.MaxValue;
-			}
-			while (currentTick >= nextEventTick) {
-				DoMIDIEvent(midiEvents.GetData());
-				if (!midiEvents.Next()) {
-					nextEventTick = UInt32.MaxValue;
-					nextEventMsec = UInt32.MaxValue;
-					isEnd = true;
-					break;
-				}
-				nextEventTick = currentTick + midiEvents.GetDeltaTime();
-				nextEventMsec = midiEvents.GetMsec();
-				// Console.WriteLine($"currentTick: {currentTick}, nextEventTick:{nextEventTick}, nextEventMsec:{nextEventMsec}");
-			}
-			return nextEventMsec;
-		}
 		private string GetMetaText(byte[] data)
 		{
 			String text = System.Text.Encoding.UTF8.GetString(data, 2, data.Length - 2);
 			return text;
 		}
-		private void DoMIDIEvent(byte[] data)
+		public override void DoEvent()
 		{
+			byte[] data = GetData();
 			if (data[0] == 0xFF) {
 				// Meta Event
 				switch (data[1]) {
@@ -460,6 +433,189 @@ public class SMFPlayer
 				// Console.WriteLine("MIDI Event: " + data[0]);
 				midiHandler.MIDIIn(data);
 			}
+		}
+	};
+
+	class BeatTrack : TrackData {
+		private struct Beat
+		{
+			public int unit;
+			public int count;
+		};
+		private Beat beat;
+		private SMFPlayer player;
+		private int ticksForMeasure;
+		private int ticksForBeat;
+		private int counterForMeasure;
+		private int counterForBeat;
+		private MIDIHandler midiHandler;
+		private int currentBeat;
+		private int currentMeasure;
+		private const byte typeBeat = 0;
+		private const byte typeMeasure = 1;
+		private const byte typeTimeSignature = 2;
+		public BeatTrack(int id, List<TrackData> trackData, SMFPlayer player, MIDIHandler handler):base(id, player) {
+			this.player = player;
+			midiHandler = handler;
+			UInt32 currentTick = 0;
+			UInt32 [] nextEventTick = new UInt32 [trackData.Count()];
+			beat.unit = 4;
+			beat.count = 4;
+			ticksForBeat = (int)player.tpqn * 4 / 4;
+			ticksForMeasure = ticksForBeat * 4;
+			AddMeasure();
+			bool allIsEnd = true;
+			do {
+				allIsEnd = true;
+				for (int i = 0; i < trackData.Count(); i++) {
+					if (trackData[i].IsEnd()) {
+						continue;
+					}
+					allIsEnd = false;
+					while (nextEventTick[i] == currentTick) {
+						ParseData(trackData[i].GetData());
+						if (!trackData[i].Next()) {
+							break;
+						}
+						nextEventTick[i] += trackData[i].GetDeltaTime();
+					}
+				}
+				CheckBeat();
+				currentTick++;
+			} while (!allIsEnd);
+		}
+		public override void Reset()
+		{
+			currentMeasure = 0;
+			currentBeat = 0;
+			base.Reset();
+		}
+		private void CheckBeat()
+		{
+			counterForMeasure--;
+			counterForBeat--;
+			if (counterForMeasure == 0) {
+				AddMeasure();
+			} else if (counterForBeat == 0) {
+				AddBeat();
+			}
+		}
+		private void AddBeat()
+		{
+			byte [] data = new byte [1];
+			data[0] = typeBeat;
+			Add((UInt32)ticksForBeat, data);
+			counterForBeat = ticksForBeat;
+		}
+		private void AddMeasure()
+		{
+			byte [] data = new byte [1];
+			data[0] = typeMeasure;
+			Add(0, data);
+			AddBeat();
+			counterForMeasure = ticksForMeasure;
+		}
+		private void SetBeat(int unit, int count)
+		{
+			beat.unit = unit;
+			beat.count = count;
+			ticksForBeat = (int)player.tpqn * 4 / unit;
+			ticksForMeasure = ticksForBeat * beat.count;
+
+			int lastindex = midiEvents.Count() - 1;
+			UInt32 lastDeltaTime = midiEvents[lastindex].deltaTime;
+			UInt32 newDeltaTime = (lastDeltaTime > counterForBeat) ? (UInt32)(lastDeltaTime - counterForBeat) : (UInt32)lastDeltaTime; // illeagal, fail safe
+			byte [] mididata = midiEvents[lastindex].data;
+			midiEvents.RemoveAt(lastindex);
+			Add(newDeltaTime, mididata);
+			byte [] data = new byte [3];
+			data[0] = typeTimeSignature;
+			data[1] = (byte)unit;
+			data[2] = (byte)count;
+			Add(0, data);			
+			AddMeasure();
+		}
+		private void ParseData(byte[] data)	
+		{
+			if (data[0] == 0xFF) {
+				// Meta Event
+				if (data[1] == 0x58) {
+					// Time Signature
+					SetBeat(2 ^ data[3], data[2]);
+				} 
+			}
+		}
+		public override void DoEvent()
+		{
+			byte[] data = GetData();
+			switch (data[0]) {
+			case typeBeat:
+				midiHandler.BeatIn(currentBeat + 1, beat.unit);
+				currentBeat++;
+				if (currentBeat >= beat.count) {
+					currentBeat = 0;
+				}
+				break;
+			case typeMeasure:
+				midiHandler.MeasureIn(currentMeasure + 1);
+				currentMeasure++;
+				break;
+			case typeTimeSignature:
+				if (data.Count() > 3) {
+					beat.unit = data[1];
+					beat.count = data[2];
+				}
+				currentBeat = 0;
+				break;
+			default:
+				break;
+			}
+		} 
+	}
+
+	class TrackPlayer {
+		public bool isEnd = false;
+		private TrackData midiEvents;
+		private SMFPlayer smfPlayer;
+		private UInt32 currentTick = 0;
+		private int currentEventIndex = 0;
+		private UInt32 nextEventTick = 0;
+		private UInt32 nextEventMsec = 0; 
+		public TrackPlayer(TrackData data, SMFPlayer player) {
+			midiEvents = data;
+			smfPlayer = player;
+		}
+		public void Reset()
+		{
+			midiEvents.Reset();
+			isEnd = false;
+			nextEventTick = midiEvents.GetDeltaTime();
+			nextEventMsec = midiEvents.GetMsec();
+			currentTick = 0;
+		}
+		public UInt32 Tickup()
+		{
+			if (isEnd) {
+				return UInt32.MaxValue;
+			}
+			currentTick += 1;
+			if (midiEvents.IsEnd()) {
+				isEnd = true;
+				return UInt32.MaxValue;
+			}
+			while (currentTick >= nextEventTick) {
+				midiEvents.DoEvent();
+				if (!midiEvents.Next()) {
+					nextEventTick = UInt32.MaxValue;
+					nextEventMsec = UInt32.MaxValue;
+					isEnd = true;
+					break;
+				}
+				nextEventTick = currentTick + midiEvents.GetDeltaTime();
+				nextEventMsec = midiEvents.GetMsec();
+				// Console.WriteLine($"currentTick: {currentTick}, nextEventTick:{nextEventTick}, nextEventMsec:{nextEventMsec}");
+			}
+			return nextEventMsec;
 		}
 	};
 }
