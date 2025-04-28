@@ -26,7 +26,7 @@ public class SMFPlayer
 		public int count;
 	};
 	public Beat beat;
-	private Stopwatch stopWatch;
+	private Stopwatch stopWatch = new Stopwatch();
 	UInt32 nextEventTime = 0;
 	UInt32 startTime = 0;
 
@@ -67,7 +67,6 @@ public class SMFPlayer
 			}
 		}
 		// Console.WriteLine("complete parsing SMF");
-		stopWatch = new Stopwatch();
 	}
 	public void Reset()
 	{
@@ -96,9 +95,9 @@ public class SMFPlayer
 		return nexttime;
 	}
 
-	public bool Start()
+	public bool Start(int _startTime = -1)
 	{
-		// UnityEngine.Debug.Log("Play Start");
+		// Console.WriteLine("Play Start");
 		if (!isValid)
 		{
 			return false;
@@ -106,21 +105,27 @@ public class SMFPlayer
 		playing = true;
 		Reset();
 		stopWatch.Start();
-		startTime = (UInt32)stopWatch.ElapsedMilliseconds;
+		if (_startTime < 0) {
+			startTime = (UInt32)stopWatch.ElapsedMilliseconds;
+		} else {
+			startTime = (UInt32)_startTime;
+		}
 		UInt32 nexttime = tickup();
 		if (nexttime == UInt32.MaxValue)
 		{
 			playing = false;
 		}
 		UInt32 nextEventTime = nexttime + startTime;
-		// UnityEngine.Debug.Log($"nextEventTime: {nextEventTime}");
+		// Console.WriteLine($"nextEventTime: {nextEventTime}");
 		return playing;
 	}
 
-	public bool Update()
+	public bool Update(UInt32 currentTime = 0)
 	{
-		UInt32 currentTime = (UInt32)stopWatch.ElapsedMilliseconds;
-		// UnityEngine.Debug.Log($"currentTime: {currentTime}");
+		if (currentTime == 0) {
+			currentTime = (UInt32)stopWatch.ElapsedMilliseconds;
+		}
+		// Console.WriteLine($"currentTime: {currentTime}");
 		while (currentTime >= nextEventTime)
 		{
 			UInt32 nexttime = tickup();
@@ -130,7 +135,7 @@ public class SMFPlayer
 				break;
 			}
 			nextEventTime = nexttime + startTime;
-			// UnityEngine.Debug.Log($"currentTime: {currentTime}, nextEventTime: {nextEventTime}");
+			// Console.WriteLine($"currentTime: {currentTime}, nextEventTime: {nextEventTime}");
 		}
 		return playing;
 	}
@@ -140,6 +145,7 @@ public class SMFPlayer
 		if (!isValid) {
 			return false;
 		}
+		stopWatch.Stop();
 		return true;
 	}
 
