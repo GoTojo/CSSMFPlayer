@@ -12,7 +12,7 @@ namespace Test
 			MidiWatcher midiWatcher = new MidiWatcher(visualizer);
 			SMFPlayer smfPlayer = new SMFPlayer(smfPath, midiWatcher);
 			smfPlayer.Start();
-			Task.Run(async () =>
+			Task.Run(() =>
 			{
 				while(smfPlayer.Update()) {
 					Task.Delay(100);

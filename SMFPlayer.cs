@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
 using System.Diagnostics;
+
 public class SMFPlayer
 {
 	private UInt16 format = 0;
@@ -17,7 +18,7 @@ public class SMFPlayer
 	private UInt16 nTracks = 0;
 	private List<TrackData> tracks = new List<TrackData>();
 	private List<TrackPlayer> players = new List<TrackPlayer>();
-	private MIDIHandler midiHandler;
+	private MIDIHandler? midiHandler;
 	private bool playing = false;
 	public struct Beat
 	{
@@ -40,7 +41,7 @@ public class SMFPlayer
 		}
 		return value;
 	}
-	public SMFPlayer(string filepath, MIDIHandler midiHandler)
+	public SMFPlayer(string filepath, MIDIHandler _midiHandler)
 	{
 		if (string.IsNullOrEmpty(filepath)) {
 			// Console.WriteLine("File path is null or empty.");
@@ -50,7 +51,7 @@ public class SMFPlayer
 			// Console.WriteLine("File does not exist: " + filepath);
 			return;
 		}
-		this.midiHandler = midiHandler;
+		midiHandler = _midiHandler ?? throw new ArgumentNullException(nameof(_midiHandler));
 		isValid = true;
 		tracks.Clear();
 		players.Clear();
@@ -157,7 +158,7 @@ public class SMFPlayer
 				break;
 			case "MTrk":
 				// Console.WriteLine("Track Chunk");
-				TrackParser parser = new TrackParser(trackid, reader, this, midiHandler);
+				TrackParser parser = new TrackParser(trackid, reader, this);
 				if (parser.isValid) {
 					tracks.Add(parser);
 					trackid++;
@@ -170,7 +171,7 @@ public class SMFPlayer
 				break;
 			}
 		} while (reader.BaseStream.Position < reader.BaseStream.Length);
-		BeatTrack beatTrack = new BeatTrack(trackid, tracks, this, midiHandler);
+		BeatTrack beatTrack = new BeatTrack(trackid, tracks, this);
 		tracks.Add(beatTrack);
 		trackid++;
 		return true;
@@ -219,7 +220,6 @@ public class SMFPlayer
 			MIDIEvent midiEvent = new MIDIEvent();
 			if (deltaMSec >= (UInt32.MaxValue - currentTime)) {
 				midiEvent.deltaTime = UInt32.MaxValue;
-				midiEvent.data = null;
 				midiEvent.msec = UInt32.MaxValue;
 				midiEvents.Add(midiEvent);
 				return false;
@@ -282,8 +282,7 @@ public class SMFPlayer
 		public bool isValid = true;
 		private SMFPlayer smfPlayer;
 		private byte runningStatus = 0;
-		private MIDIHandler midiHandler;
-		public TrackParser(int trackid, BinaryReader reader, SMFPlayer player, MIDIHandler handler):base(trackid, player) {
+		public TrackParser(int trackid, BinaryReader reader, SMFPlayer player):base(trackid, player) {
 			smfPlayer = player;
 			runningStatus = 0;
 			UInt32 size = SMFPlayer.BEReader(reader, 4);
@@ -291,7 +290,6 @@ public class SMFPlayer
 				isValid = false;
 				return;
 			}
-			midiHandler = handler;
 			Clear();
 			byte[] data = new byte[size];
 			reader.Read(data, 0, (int)size);
@@ -428,7 +426,7 @@ public class SMFPlayer
 						break;
 					case 0x5:
 						//Lyric Event
-						midiHandler.LyricIn(GetMetaText(data));
+						smfPlayer.midiHandler?.LyricIn(GetMetaText(data));
 						break;
 					default:
 						// Console.WriteLine("Meta Event: " + data[1]);
@@ -437,7 +435,7 @@ public class SMFPlayer
 			} else {
 				// MIDI Event
 				// Console.WriteLine("MIDI Event: " + data[0]);
-				midiHandler.MIDIIn(data);
+				smfPlayer.midiHandler?.MIDIIn(data);
 			}
 		}
 	};
@@ -454,15 +452,13 @@ public class SMFPlayer
 		private int ticksForBeat;
 		private int counterForMeasure;
 		private int counterForBeat;
-		private MIDIHandler midiHandler;
 		private int currentBeat;
 		private int currentMeasure;
 		private const byte typeBeat = 0;
 		private const byte typeMeasure = 1;
 		private const byte typeTimeSignature = 2;
-		public BeatTrack(int id, List<TrackData> trackData, SMFPlayer player, MIDIHandler handler):base(id, player) {
+		public BeatTrack(int id, List<TrackData> trackData, SMFPlayer player):base(id, player) {
 			this.player = player;
-			midiHandler = handler;
 			UInt32 currentTick = 0;
 			UInt32 [] nextEventTick = new UInt32 [trackData.Count()];
 			beat.unit = 4;
@@ -568,14 +564,14 @@ public class SMFPlayer
 			byte[] data = GetData();
 			switch (data[0]) {
 			case typeBeat:
-				midiHandler.BeatIn(data[1] + 1, beat.unit);
+				player.midiHandler?.BeatIn(data[1] + 1, beat.unit);
 				currentBeat++;
 				if (currentBeat >= beat.count) {
 					currentBeat = 0;
 				}
 				break;
 			case typeMeasure:
-				midiHandler.MeasureIn(data[1] + 1);
+				player.midiHandler?.MeasureIn(data[1] + 1);
 				currentMeasure++;
 				break;
 			case typeTimeSignature:
@@ -596,7 +592,6 @@ public class SMFPlayer
 		private TrackData midiEvents;
 		private SMFPlayer smfPlayer;
 		private UInt32 currentTick = 0;
-		private int currentEventIndex = 0;
 		private UInt32 nextEventTick = 0;
 		private UInt32 nextEventMsec = 0; 
 		public TrackPlayer(TrackData data, SMFPlayer player) {
