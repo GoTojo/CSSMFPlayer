@@ -273,7 +273,6 @@ public class SMFPlayer
 
 	class TrackParser : TrackData {
 		public bool isValid = true;
-		public bool isEnd = false;
 		private SMFPlayer smfPlayer;
 		private byte runningStatus = 0;
 		private MIDIHandler midiHandler;
@@ -463,7 +462,10 @@ public class SMFPlayer
 			beat.count = 4;
 			ticksForBeat = (int)player.tpqn * 4 / 4;
 			ticksForMeasure = ticksForBeat * 4;
-			AddMeasure();
+			foreach(TrackData track in trackData) {
+				track.Reset();
+			}
+			AddMeasure(0);
 			bool allIsEnd = true;
 			do {
 				allIsEnd = true;
@@ -483,6 +485,15 @@ public class SMFPlayer
 				CheckBeat();
 				currentTick++;
 			} while (!allIsEnd);
+			// Reset();
+			// while (!IsEnd()) {
+			// 	Console.WriteLine("#deltaTime: " + GetDeltaTime());
+			// 	Console.WriteLine("#data: " + GetData()[0]);
+			// 	Console.WriteLine("#msec: " + GetMsec());
+			// 	if (!Next()) {
+			// 		break;
+			// 	}
+			// };
 		}
 		public override void Reset()
 		{
@@ -495,24 +506,24 @@ public class SMFPlayer
 			counterForMeasure--;
 			counterForBeat--;
 			if (counterForMeasure == 0) {
-				AddMeasure();
+				AddMeasure(ticksForBeat);
 			} else if (counterForBeat == 0) {
-				AddBeat();
+				AddBeat(ticksForBeat);
 			}
 		}
-		private void AddBeat()
+		private void AddBeat(int deltaTime)
 		{
 			byte [] data = new byte [1];
 			data[0] = typeBeat;
-			Add((UInt32)ticksForBeat, data);
+			Add((UInt32)deltaTime, data);
 			counterForBeat = ticksForBeat;
 		}
-		private void AddMeasure()
+		private void AddMeasure(int deltaTime)
 		{
 			byte [] data = new byte [1];
 			data[0] = typeMeasure;
-			Add(0, data);
-			AddBeat();
+			Add((UInt32)deltaTime, data);
+			AddBeat(0);
 			counterForMeasure = ticksForMeasure;
 		}
 		private void SetBeat(int unit, int count)
@@ -522,18 +533,12 @@ public class SMFPlayer
 			ticksForBeat = (int)player.tpqn * 4 / unit;
 			ticksForMeasure = ticksForBeat * beat.count;
 
-			int lastindex = midiEvents.Count() - 1;
-			UInt32 lastDeltaTime = midiEvents[lastindex].deltaTime;
-			UInt32 newDeltaTime = (lastDeltaTime > counterForBeat) ? (UInt32)(lastDeltaTime - counterForBeat) : (UInt32)lastDeltaTime; // illeagal, fail safe
-			byte [] mididata = midiEvents[lastindex].data;
-			midiEvents.RemoveAt(lastindex);
-			Add(newDeltaTime, mididata);
 			byte [] data = new byte [3];
 			data[0] = typeTimeSignature;
 			data[1] = (byte)unit;
 			data[2] = (byte)count;
 			Add(0, data);			
-			AddMeasure();
+			AddMeasure(counterForBeat);
 		}
 		private void ParseData(byte[] data)	
 		{
