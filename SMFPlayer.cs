@@ -25,6 +25,9 @@ public class SMFPlayer
 		public int count;
 	};
 	public Beat beat;
+	private Stopwatch stopWatch;
+	UInt32 nextEventTime = 0;
+	UInt32 startTime = 0;
 
 	public static UInt32 BEReader(BinaryReader reader, int len)
 	{
@@ -63,11 +66,14 @@ public class SMFPlayer
 			}
 		}
 		// Console.WriteLine("complete parsing SMF");
+		stopWatch = new Stopwatch();
 	}
 	public void Reset()
 	{
 		beat.count = 4;
 		beat.unit = 4; // default is 4 / 4
+		nextEventTime = 0;
+		startTime = 0;
 		foreach (TrackPlayer player in players){
 			player.Reset();
 		}
@@ -88,45 +94,46 @@ public class SMFPlayer
 		}
 		return nexttime;
 	}
-	public bool Play()
+
+	public bool Start()
 	{
-		// Console.WriteLine("Play Start");
-		if (!isValid) {
+		// UnityEngine.Debug.Log("Play Start");
+		if (!isValid)
+		{
 			return false;
 		}
 		playing = true;
-		Stopwatch stopWatch = new Stopwatch();
-		stopWatch.Start();
-		UInt32 startTime = (UInt32)stopWatch.ElapsedMilliseconds;
 		Reset();
+		stopWatch.Start();
+		startTime = (UInt32)stopWatch.ElapsedMilliseconds;
 		UInt32 nexttime = tickup();
-		if (nexttime == UInt32.MaxValue) {
+		if (nexttime == UInt32.MaxValue)
+		{
 			playing = false;
 		}
 		UInt32 nextEventTime = nexttime + startTime;
-		// Console.WriteLine($"nextEventTime: {nextEventTime}");
-		Task.Run(async () =>
-		{
-			while (playing) {
-				UInt32 currentTime = (UInt32)stopWatch.ElapsedMilliseconds;
-				// Console.WriteLine($"currentTime: {currentTime}");
-				while (currentTime >= nextEventTime) {
-					nexttime = tickup();
-					if (nexttime == UInt32.MaxValue) {
-						playing = false;
-						break;
-					}
-					nextEventTime = nexttime + startTime;
-					// Console.WriteLine($"currentTime: {currentTime}, nextEventTime: {nextEventTime}");
-				}
-				UInt32 delay =(UInt32)(usecPerQuarterNote / 1000 / 4);
-				// Console.WriteLine($"wait {delay}ms");
-				await Task.Delay((int)delay);
-			};
-			stopWatch.Stop();
-		});
-		return true;
+		// UnityEngine.Debug.Log($"nextEventTime: {nextEventTime}");
+		return playing;
 	}
+
+	public bool Update()
+	{
+		UInt32 currentTime = (UInt32)stopWatch.ElapsedMilliseconds;
+		// UnityEngine.Debug.Log($"currentTime: {currentTime}");
+		while (currentTime >= nextEventTime)
+		{
+			UInt32 nexttime = tickup();
+			if (nexttime == UInt32.MaxValue)
+			{
+				playing = false;
+				break;
+			}
+			nextEventTime = nexttime + startTime;
+			// UnityEngine.Debug.Log($"currentTime: {currentTime}, nextEventTime: {nextEventTime}");
+		}
+		return playing;
+	}
+
 	public bool Stop()
 	{
 		if (!isValid) {
@@ -465,6 +472,7 @@ public class SMFPlayer
 			foreach(TrackData track in trackData) {
 				track.Reset();
 			}
+			Reset();
 			AddMeasure(0);
 			bool allIsEnd = true;
 			do {
