@@ -513,15 +513,20 @@ public class SMFPlayer
 		}
 		private void AddBeat(int deltaTime)
 		{
-			byte [] data = new byte [1];
+			byte [] data = new byte [2];
 			data[0] = typeBeat;
+			data[1] = (byte)currentBeat;
+			currentBeat++;
 			Add((UInt32)deltaTime, data);
 			counterForBeat = ticksForBeat;
 		}
 		private void AddMeasure(int deltaTime)
 		{
-			byte [] data = new byte [1];
+			byte [] data = new byte [2];
 			data[0] = typeMeasure;
+			data[1] = (byte)currentMeasure;
+			currentMeasure++;
+			currentBeat = 0;
 			Add((UInt32)deltaTime, data);
 			AddBeat(0);
 			counterForMeasure = ticksForMeasure;
@@ -555,14 +560,14 @@ public class SMFPlayer
 			byte[] data = GetData();
 			switch (data[0]) {
 			case typeBeat:
-				midiHandler.BeatIn(currentBeat + 1, beat.unit);
+				midiHandler.BeatIn(data[1] + 1, beat.unit);
 				currentBeat++;
 				if (currentBeat >= beat.count) {
 					currentBeat = 0;
 				}
 				break;
 			case typeMeasure:
-				midiHandler.MeasureIn(currentMeasure + 1);
+				midiHandler.MeasureIn(data[1] + 1);
 				currentMeasure++;
 				break;
 			case typeTimeSignature:
