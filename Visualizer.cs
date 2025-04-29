@@ -7,14 +7,14 @@ public class MidiWatcher : MIDIHandler
     {
         this.visualizer = visualizer;
     }
-    public override void MIDIIn(byte[] midiEvent)
+    public override void MIDIIn(byte[] midiEvent, float position)
     {
-        visualizer.MIDIIn(midiEvent);
+        visualizer.MIDIIn(midiEvent, position);
     }
 
-    public override void LyricIn(string lyric)
+    public override void LyricIn(string lyric, float position)
     {
-        visualizer.LyricIn(lyric);
+        visualizer.LyricIn(lyric, position);
     }
  
     public override void BeatIn(int numerator, int denominator)
@@ -29,12 +29,13 @@ public class MidiWatcher : MIDIHandler
 }
 public class Visualizer
 {
-    public void MIDIIn(byte[] midiEvent)
+    public void MIDIIn(byte[] midiEvent, float position)
     {
+        Console.WriteLine($"status: {midiEvent}, position: {position}");
     }
-    public void LyricIn(string lyric)
+    public void LyricIn(string lyric, float position)
     {
-        Console.WriteLine(lyric);
+        Console.WriteLine($"lyric: {lyric}, position: {position}");
     }
     public void BeatIn(int numerator, int denominator)
     {

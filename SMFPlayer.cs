@@ -29,6 +29,7 @@ public class SMFPlayer
 	private Stopwatch stopWatch = new Stopwatch();
 	UInt32 nextEventTime = 0;
 	UInt32 startTime = 0;
+	UInt32 lastMeasTime = 0;
 
 	public static UInt32 BEReader(BinaryReader reader, int len)
 	{
@@ -74,6 +75,7 @@ public class SMFPlayer
 		beat.unit = 4; // default is 4 / 4
 		nextEventTime = 0;
 		startTime = 0;
+		lastMeasTime = 0;
 		foreach (TrackPlayer player in players){
 			player.Reset();
 		}
@@ -147,6 +149,14 @@ public class SMFPlayer
 		}
 		stopWatch.Stop();
 		return true;
+	}
+
+	public float GetPosition(UInt32 msec)
+	{
+		float current = (float)((msec > lastMeasTime) ? msec - lastMeasTime : 0);
+		float msecForMeasure = beat.count * usecPerQuarterNote * 4 / beat.unit / 1000;
+		Console.WriteLine($"GetPosition: lastMeas: {lastMeasTime}, msec: {msec}, position: {current / msecForMeasure}");
+		return current / msecForMeasure;
 	}
 
 	private bool ParseChunk(BinaryReader reader) 
@@ -432,7 +442,7 @@ public class SMFPlayer
 						break;
 					case 0x5:
 						//Lyric Event
-						smfPlayer.midiHandler?.LyricIn(GetMetaText(data));
+						smfPlayer.midiHandler?.LyricIn(GetMetaText(data), smfPlayer.GetPosition(GetMsec()));
 						break;
 					default:
 						// Console.WriteLine("Meta Event: " + data[1]);
@@ -441,7 +451,7 @@ public class SMFPlayer
 			} else {
 				// MIDI Event
 				// Console.WriteLine("MIDI Event: " + data[0]);
-				smfPlayer.midiHandler?.MIDIIn(data);
+				smfPlayer.midiHandler?.MIDIIn(data, smfPlayer.GetPosition(GetMsec()));
 			}
 		}
 	};
@@ -577,6 +587,7 @@ public class SMFPlayer
 				}
 				break;
 			case typeMeasure:
+				player.lastMeasTime = GetMsec();
 				player.midiHandler?.MeasureIn(data[1] + 1);
 				currentMeasure++;
 				break;
