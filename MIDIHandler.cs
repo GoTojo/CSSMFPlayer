@@ -1,3 +1,7 @@
+/// MIDIHandler.cs
+/// Interface Class for Receive MidiEvents
+/// Copyright (c) 2025 gotojo, All Rights Reserved.
+
 public class MIDIHandler {
 	public virtual void MIDIIn(byte[] midiEvent, float position) {
 

@@ -1,3 +1,7 @@
+/// test.cs
+/// Sample for using SMFPlayer
+/// Copyright (c) 2025 gotojo, All Rights Reserved.
+
 using System.IO;
 
 namespace Test

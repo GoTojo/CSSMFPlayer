@@ -1,3 +1,7 @@
+/// SMFPlayer.cs
+/// SMF with lyrics player for C#
+/// Copyright (c) 2025 gotojo, All Rights Reserved.
+
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;

@@ -1,3 +1,7 @@
+/// Visualizer.cs
+/// Concrete Class for SMFPlayer
+/// Copyright (C) 2025 gotojo, All Rights Reserved.
+
 using System.Collections;
 using System.Collections.Generic;
 public class MidiWatcher : MIDIHandler
