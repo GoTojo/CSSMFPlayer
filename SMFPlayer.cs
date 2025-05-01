@@ -192,7 +192,7 @@ public class SMFPlayer
 			}
 		} while (reader.BaseStream.Position < reader.BaseStream.Length);
 		BeatTrack beatTrack = new BeatTrack(trackid, tracks, this);
-		tracks.Add(beatTrack);
+		tracks.Insert(0, beatTrack);
 		trackid++;
 		return true;
 	}
