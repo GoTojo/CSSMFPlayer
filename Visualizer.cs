@@ -35,7 +35,7 @@ public class Visualizer
 {
     public void MIDIIn(byte[] midiEvent, float position)
     {
-        Console.WriteLine($"status: {midiEvent}, position: {position}");
+        Console.WriteLine($"status: {midiEvent[0]}, position: {position}");
     }
     public void LyricIn(string lyric, float position)
     {
