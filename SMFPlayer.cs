@@ -155,10 +155,17 @@ public class SMFPlayer
 		return true;
 	}
 
+	public float GetMsecForMeasure()
+	{
+		float msecForMeasure = beat.count * usecPerQuarterNote * 4 / beat.unit / 1000;
+		// Console.WriteLine($"GetMsecForMeasure: {msecForMeasure}");
+		return msecForMeasure;
+	}
+
 	public float GetPosition(UInt32 msec)
 	{
 		float current = (float)((msec > lastMeasTime) ? msec - lastMeasTime : 0);
-		float msecForMeasure = beat.count * usecPerQuarterNote * 4 / beat.unit / 1000;
+		float msecForMeasure = GetMsecForMeasure();
 		Console.WriteLine($"GetPosition: lastMeas: {lastMeasTime}, msec: {msec}, position: {current / msecForMeasure}");
 		return current / msecForMeasure;
 	}
@@ -592,7 +599,7 @@ public class SMFPlayer
 				break;
 			case typeMeasure:
 				player.lastMeasTime = GetMsec();
-				player.midiHandler?.MeasureIn(data[1] + 1);
+				player.midiHandler?.MeasureIn(data[1] + 1, (int)player.GetMsecForMeasure());
 				currentMeasure++;
 				break;
 			case typeTimeSignature:

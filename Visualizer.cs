@@ -26,9 +26,9 @@ public class MidiWatcher : MIDIHandler
         visualizer.BeatIn(numerator, denominator);
     }
 
-    public override void MeasureIn(int num)
+    public override void MeasureIn(int num, int measureInterval)
     {
-        visualizer.MeasureIn(num);
+        visualizer.MeasureIn(num, measureInterval);
     }
 }
 public class Visualizer
@@ -45,8 +45,8 @@ public class Visualizer
     {
         Console.WriteLine($"Beat: {numerator} / {denominator}");
     }
-    public void MeasureIn(int num)
+    public void MeasureIn(int num, int measureInterval)
     {
-        Console.WriteLine($"Measure: {num}");
+        Console.WriteLine($"Measure: {num}, Interval: {measureInterval}");
     }
 }
