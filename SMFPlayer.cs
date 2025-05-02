@@ -32,9 +32,9 @@ public class SMFPlayer
 	public Beat beat;
 	public int numOfMeasure = 0;
 	private Stopwatch stopWatch = new Stopwatch();
-	UInt32 nextEventTime = 0;
-	UInt32 startTime = 0;
-	UInt32 lastMeasTime = 0;
+	private UInt32 nextEventTime = 0;
+	private UInt32 startTime = 0;
+	private UInt32 lastMeasTime = 0;
 
 	public static UInt32 BEReader(BinaryReader reader, int len)
 	{
