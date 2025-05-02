@@ -30,6 +30,7 @@ public class SMFPlayer
 		public int count;
 	};
 	public Beat beat;
+	public int numOfMeasure = 0;
 	private Stopwatch stopWatch = new Stopwatch();
 	UInt32 nextEventTime = 0;
 	UInt32 startTime = 0;
@@ -200,6 +201,8 @@ public class SMFPlayer
 		} while (reader.BaseStream.Position < reader.BaseStream.Length);
 		BeatTrack beatTrack = new BeatTrack(trackid, tracks, this);
 		tracks.Insert(0, beatTrack);
+		numOfMeasure = beatTrack.numOfMeasure;
+		Console.WriteLine($"numOfMeasure: {numOfMeasure}");
 		trackid++;
 		return true;
 	}
@@ -484,6 +487,7 @@ public class SMFPlayer
 		private const byte typeBeat = 0;
 		private const byte typeMeasure = 1;
 		private const byte typeTimeSignature = 2;
+		public int numOfMeasure = 0;
 		public BeatTrack(int id, List<TrackData> trackData, SMFPlayer player):base(id, player) {
 			this.player = player;
 			UInt32 currentTick = 0;
@@ -516,6 +520,7 @@ public class SMFPlayer
 				CheckBeat();
 				currentTick++;
 			} while (!allIsEnd);
+			numOfMeasure = currentMeasure;
 			// Reset();
 			// while (!IsEnd()) {
 			// 	Console.WriteLine("#deltaTime: " + GetDeltaTime());
