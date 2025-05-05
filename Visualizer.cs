@@ -20,7 +20,10 @@ public class MidiWatcher : MIDIHandler
     {
         visualizer.LyricIn(lyric, position);
     }
- 
+    public override void TempoIn(float msecPerQuaterNote, UInt32 tempo)
+    {
+        visualizer.TempoIn(msecPerQuaterNote, tempo);
+    }
     public override void BeatIn(int numerator, int denominator)
     {
         visualizer.BeatIn(numerator, denominator);
@@ -40,6 +43,10 @@ public class Visualizer
     public void LyricIn(string lyric, float position)
     {
         Console.WriteLine($"lyric: {lyric}, position: {position}");
+    }
+    public void TempoIn(float msecPerQuaterNote, UInt32 tempo)
+    {
+        Console.WriteLine($"tempo: {(int)msecPerQuaterNote}ms({tempo})");
     }
     public void BeatIn(int numerator, int denominator)
     {

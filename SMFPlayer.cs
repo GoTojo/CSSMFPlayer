@@ -441,6 +441,7 @@ public class SMFPlayer
 						usecPerQuarterNote &= 0x00FFFFFF;
 						smfPlayer.tempo = 60000000 / usecPerQuarterNote;
 						smfPlayer.usecPerQuarterNote = usecPerQuarterNote;
+						smfPlayer.midiHandler?.TempoIn(usecPerQuarterNote / 1000, smfPlayer.tempo);
 						// Console.WriteLine("Tempo: " + smfPlayer.tempo);
 						break;
 					case 0x58:

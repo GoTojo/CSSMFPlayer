@@ -9,6 +9,9 @@ public class MIDIHandler {
 	public virtual void LyricIn(string lyric, float position) {
 		
 	}
+	public virtual void TempoIn(float msecPerQuaterNote, UInt32 tempo) {
+		
+	}
 	public virtual void BeatIn(int numerator, int denominator) {
 		
 	}
