@@ -153,6 +153,7 @@ public class SMFPlayer
 			return false;
 		}
 		stopWatch.Stop();
+		playing = false;
 		return true;
 	}
 
