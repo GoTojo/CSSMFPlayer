@@ -11,14 +11,14 @@ public class MidiWatcher : MIDIHandler
     {
         this.visualizer = visualizer;
     }
-    public override void MIDIIn(byte[] midiEvent, float position)
+    public override void MIDIIn(int track, byte[] midiEvent, float position)
     {
-        visualizer.MIDIIn(midiEvent, position);
+        visualizer.MIDIIn(track, midiEvent, position);
     }
 
-    public override void LyricIn(string lyric, float position)
+    public override void LyricIn(int track, string lyric, float position)
     {
-        visualizer.LyricIn(lyric, position);
+        visualizer.LyricIn(track, lyric, position);
     }
     public override void TempoIn(float msecPerQuaterNote, UInt32 tempo)
     {
@@ -36,13 +36,13 @@ public class MidiWatcher : MIDIHandler
 }
 public class Visualizer
 {
-    public void MIDIIn(byte[] midiEvent, float position)
+    public void MIDIIn(int track, byte[] midiEvent, float position)
     {
-        Console.WriteLine($"status: {midiEvent[0]}, position: {position}");
+        Console.WriteLine($"Track: {track}, status: {midiEvent[0]}, position: {position}");
     }
-    public void LyricIn(string lyric, float position)
+    public void LyricIn(int track, string lyric, float position)
     {
-        Console.WriteLine($"lyric: {lyric}, position: {position}");
+        Console.WriteLine($"Track: {track}, lyric: {lyric}, position: {position}");
     }
     public void TempoIn(float msecPerQuaterNote, UInt32 tempo)
     {

@@ -11,7 +11,8 @@ namespace Test
 		static void Main()
 		{
 			Console.WriteLine("Hello, World!");
-			string smfPath = @"らーめん食べよう.mid";
+			// string smfPath = @"らーめん食べよう.mid";
+			string smfPath = @"3分間のトキメキ.mid";
 			Visualizer visualizer = new Visualizer();
 			MidiWatcher midiWatcher = new MidiWatcher(visualizer);
 			SMFPlayer smfPlayer = new SMFPlayer(smfPath, midiWatcher);

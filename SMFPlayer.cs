@@ -221,7 +221,7 @@ public class SMFPlayer
 	}
 
 	class TrackData {
-		private int id;
+		protected int id;
 		private SMFPlayer player;
 		protected bool isEnd;
 		public struct MIDIEvent
@@ -458,7 +458,7 @@ public class SMFPlayer
 						break;
 					case 0x5:
 						//Lyric Event
-						smfPlayer.midiHandler?.LyricIn(GetMetaText(data), smfPlayer.GetPosition(GetMsec()));
+						smfPlayer.midiHandler?.LyricIn(id, GetMetaText(data), smfPlayer.GetPosition(GetMsec()));
 						break;
 					default:
 						// Console.WriteLine("Meta Event: " + data[1]);
@@ -467,7 +467,7 @@ public class SMFPlayer
 			} else {
 				// MIDI Event
 				// Console.WriteLine("MIDI Event: " + data[0]);
-				smfPlayer.midiHandler?.MIDIIn(data, smfPlayer.GetPosition(GetMsec()));
+				smfPlayer.midiHandler?.MIDIIn(id, data, smfPlayer.GetPosition(GetMsec()));
 			}
 		}
 	};
