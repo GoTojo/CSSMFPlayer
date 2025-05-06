@@ -19,6 +19,7 @@ public class SMFPlayer
 	public UInt32 tpqn = 96;
 	public float usecPerQuarterNote = 60000000 / 120;
 	public bool isValid = false;
+	public bool mute = false;
 	private UInt16 nTracks = 0;
 	private List<TrackData> tracks = new List<TrackData>();
 	private List<TrackPlayer> players = new List<TrackPlayer>();
@@ -442,7 +443,9 @@ public class SMFPlayer
 						usecPerQuarterNote &= 0x00FFFFFF;
 						smfPlayer.tempo = 60000000 / usecPerQuarterNote;
 						smfPlayer.usecPerQuarterNote = usecPerQuarterNote;
-						smfPlayer.midiHandler?.TempoIn(usecPerQuarterNote / 1000, smfPlayer.tempo);
+						if (!smfPlayer.mute) {
+							smfPlayer.midiHandler?.TempoIn(usecPerQuarterNote / 1000, smfPlayer.tempo);
+						}
 						// Console.WriteLine("Tempo: " + smfPlayer.tempo);
 						break;
 					case 0x58:
@@ -458,7 +461,9 @@ public class SMFPlayer
 						break;
 					case 0x5:
 						//Lyric Event
-						smfPlayer.midiHandler?.LyricIn(id, GetMetaText(data), smfPlayer.GetPosition(GetMsec()));
+						if (!smfPlayer.mute) {
+							smfPlayer.midiHandler?.LyricIn(id, GetMetaText(data), smfPlayer.GetPosition(GetMsec()));
+						}
 						break;
 					default:
 						// Console.WriteLine("Meta Event: " + data[1]);
@@ -467,7 +472,9 @@ public class SMFPlayer
 			} else {
 				// MIDI Event
 				// Console.WriteLine("MIDI Event: " + data[0]);
-				smfPlayer.midiHandler?.MIDIIn(id, data, smfPlayer.GetPosition(GetMsec()));
+				if (!smfPlayer.mute) {
+					smfPlayer.midiHandler?.MIDIIn(id, data, smfPlayer.GetPosition(GetMsec()));
+				}
 			}
 		}
 	};
@@ -598,7 +605,9 @@ public class SMFPlayer
 			byte[] data = GetData();
 			switch (data[0]) {
 			case typeBeat:
-				player.midiHandler?.BeatIn(data[1] + 1, beat.unit);
+				if (!player.mute) {
+					player.midiHandler?.BeatIn(data[1] + 1, beat.unit);
+				}
 				currentBeat++;
 				if (currentBeat >= beat.count) {
 					currentBeat = 0;
@@ -606,7 +615,9 @@ public class SMFPlayer
 				break;
 			case typeMeasure:
 				player.lastMeasTime = GetMsec();
-				player.midiHandler?.MeasureIn(data[1] + 1, (int)player.GetMsecForMeasure());
+				if (!player.mute) {
+					player.midiHandler?.MeasureIn(data[1] + 1, (int)player.GetMsecForMeasure());
+				}
 				currentMeasure++;
 				break;
 			case typeTimeSignature:
