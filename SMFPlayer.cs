@@ -169,7 +169,7 @@ public class SMFPlayer
 	{
 		float current = (float)((msec > lastMeasTime) ? msec - lastMeasTime : 0);
 		float msecForMeasure = GetMsecForMeasure();
-		Console.WriteLine($"GetPosition: lastMeas: {lastMeasTime}, msec: {msec}, position: {current / msecForMeasure}");
+		// Console.WriteLine($"GetPosition: lastMeas: {lastMeasTime}, msec: {msec}, position: {current / msecForMeasure}");
 		return current / msecForMeasure;
 	}
 
@@ -505,8 +505,9 @@ public class SMFPlayer
 			beat.count = 4;
 			ticksForBeat = (int)player.tpqn * 4 / 4;
 			ticksForMeasure = ticksForBeat * 4;
-			foreach(TrackData track in trackData) {
-				track.Reset();
+			for (int i = 0; i < trackData.Count(); i++) {
+				trackData[i].Reset();
+				nextEventTick[i] = trackData[i].GetDeltaTime();
 			}
 			Reset();
 			AddMeasure(0);
