@@ -170,7 +170,8 @@ public class SMFPlayer
 		float current = (float)((msec > lastMeasTime) ? msec - lastMeasTime : 0);
 		float msecForMeasure = GetMsecForMeasure();
 		// Console.WriteLine($"GetPosition: lastMeas: {lastMeasTime}, msec: {msec}, position: {current / msecForMeasure}");
-		return current / msecForMeasure;
+		float position = current / msecForMeasure;
+		return (position < 1.0f) ? position : 1.0f;
 	}
 
 	private bool ParseChunk(BinaryReader reader) 
