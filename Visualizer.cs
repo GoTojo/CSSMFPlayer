@@ -11,49 +11,49 @@ public class MidiWatcher : MIDIHandler
     {
         this.visualizer = visualizer;
     }
-    public override void MIDIIn(int track, byte[] midiEvent, float position)
+    public override void MIDIIn(int track, byte[] midiEvent, float position, UInt32 currentMsec)
     {
-        visualizer.MIDIIn(track, midiEvent, position);
+        visualizer.MIDIIn(track, midiEvent, position, currentMsec);
     }
 
-    public override void LyricIn(int track, string lyric, float position)
+    public override void LyricIn(int track, string lyric, float position, UInt32 currentMsec)
     {
-        visualizer.LyricIn(track, lyric, position);
+        visualizer.LyricIn(track, lyric, position, currentMsec);
     }
-    public override void TempoIn(float msecPerQuaterNote, UInt32 tempo)
+    public override void TempoIn(float msecPerQuaterNote, UInt32 tempo, UInt32 currentMsec)
     {
-        visualizer.TempoIn(msecPerQuaterNote, tempo);
+        visualizer.TempoIn(msecPerQuaterNote, tempo, currentMsec);
     }
-    public override void BeatIn(int numerator, int denominator)
+    public override void BeatIn(int numerator, int denominator, UInt32 currentMsec)
     {
-        visualizer.BeatIn(numerator, denominator);
+        visualizer.BeatIn(numerator, denominator, currentMsec);
     }
 
-    public override void MeasureIn(int num, int measureInterval)
+    public override void MeasureIn(int num, int measureInterval, UInt32 currentMsec)
     {
-        visualizer.MeasureIn(num, measureInterval);
+        visualizer.MeasureIn(num, measureInterval, currentMsec);
     }
 }
 public class Visualizer
 {
-    public void MIDIIn(int track, byte[] midiEvent, float position)
+    public void MIDIIn(int track, byte[] midiEvent, float position, UInt32 currentMsec)
     {
-        Console.WriteLine($"Track: {track}, status: {midiEvent[0]}, position: {position}");
+        Console.WriteLine($"Track: {track}, status: {midiEvent[0]}, position: {position}, currentMsec: {currentMsec}");
     }
-    public void LyricIn(int track, string lyric, float position)
+    public void LyricIn(int track, string lyric, float position, UInt32 currentMsec)
     {
-        Console.WriteLine($"Track: {track}, lyric: {lyric}, position: {position}");
+        Console.WriteLine($"Track: {track}, lyric: {lyric}, position: {position}, currentMsec: {currentMsec}");
     }
-    public void TempoIn(float msecPerQuaterNote, UInt32 tempo)
+    public void TempoIn(float msecPerQuaterNote, UInt32 tempo, UInt32 currentMsec)
     {
-        Console.WriteLine($"tempo: {(int)msecPerQuaterNote}ms({tempo})");
+        Console.WriteLine($"tempo: {(int)msecPerQuaterNote}ms({tempo}), currentMsec: {currentMsec}");
     }
-    public void BeatIn(int numerator, int denominator)
+    public void BeatIn(int numerator, int denominator, UInt32 currentMsec)
     {
-        Console.WriteLine($"Beat: {numerator} / {denominator}");
+        Console.WriteLine($"Beat: {numerator} / {denominator}, currentMsec: {currentMsec}");
     }
-    public void MeasureIn(int num, int measureInterval)
+    public void MeasureIn(int num, int measureInterval, UInt32 currentMsec)
     {
-        Console.WriteLine($"Measure: {num}, Interval: {measureInterval}");
+        Console.WriteLine($"Measure: {num}, Interval: {measureInterval}, currentMsec: {currentMsec}");
     }
 }

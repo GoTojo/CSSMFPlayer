@@ -445,7 +445,7 @@ public class SMFPlayer
 						smfPlayer.tempo = 60000000 / usecPerQuarterNote;
 						smfPlayer.usecPerQuarterNote = usecPerQuarterNote;
 						if (!smfPlayer.mute) {
-							smfPlayer.midiHandler?.TempoIn(usecPerQuarterNote / 1000, smfPlayer.tempo);
+							smfPlayer.midiHandler?.TempoIn(usecPerQuarterNote / 1000, smfPlayer.tempo, GetMsec());
 						}
 						// Console.WriteLine("Tempo: " + smfPlayer.tempo);
 						break;
@@ -463,7 +463,7 @@ public class SMFPlayer
 					case 0x5:
 						//Lyric Event
 						if (!smfPlayer.mute) {
-							smfPlayer.midiHandler?.LyricIn(id, GetMetaText(data), smfPlayer.GetPosition(GetMsec()));
+							smfPlayer.midiHandler?.LyricIn(id, GetMetaText(data), smfPlayer.GetPosition(GetMsec()), GetMsec());
 						}
 						break;
 					default:
@@ -474,7 +474,7 @@ public class SMFPlayer
 				// MIDI Event
 				// Console.WriteLine("MIDI Event: " + data[0]);
 				if (!smfPlayer.mute) {
-					smfPlayer.midiHandler?.MIDIIn(id, data, smfPlayer.GetPosition(GetMsec()));
+					smfPlayer.midiHandler?.MIDIIn(id, data, smfPlayer.GetPosition(GetMsec()), GetMsec());
 				}
 			}
 		}
@@ -608,7 +608,7 @@ public class SMFPlayer
 			switch (data[0]) {
 			case typeBeat:
 				if (!player.mute) {
-					player.midiHandler?.BeatIn(data[1] + 1, beat.unit);
+					player.midiHandler?.BeatIn(data[1] + 1, beat.unit, GetMsec());
 				}
 				currentBeat++;
 				if (currentBeat >= beat.count) {
@@ -618,7 +618,7 @@ public class SMFPlayer
 			case typeMeasure:
 				player.lastMeasTime = GetMsec();
 				if (!player.mute) {
-					player.midiHandler?.MeasureIn(data[1] + 1, (int)player.GetMsecForMeasure());
+					player.midiHandler?.MeasureIn(data[1] + 1, (int)player.GetMsecForMeasure(), GetMsec());
 				}
 				currentMeasure++;
 				break;
