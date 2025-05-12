@@ -36,6 +36,10 @@ public class SMFPlayer
 	private UInt32 nextEventTime = 0;
 	private UInt32 startTime = 0;
 	private UInt32 lastMeasTime = 0;
+	public int GetNumOfTrack()
+	{
+		return tracks.Count() - 1;
+	}
 
 	public static UInt32 BEReader(BinaryReader reader, int len)
 	{
