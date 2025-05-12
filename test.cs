@@ -8,16 +8,29 @@ namespace Test
 {
 	public class Test
 	{
-		static void Main()
+		static void Main(string[] args)
 		{
+			string mode = "p";
+			string filename = "";
+			if (args.Count() == 0) {
+				Console.WriteLine("usage: test p|m filename");
+				return;
+			} else if (args.Count() == 1) {
+				filename = args[0];
+			} else {
+				mode = args[0];
+				filename = args[1];
+			}
 			Test test = new Test();
-			// test.LyricPlayer();
-			test.MapCreator();
+			if (mode == "m") {
+				test.MapCreator(filename);
+			} else {
+				test.LyricPlayer(filename);
+			}
 		}
-		void LyricPlayer()
+		void LyricPlayer(string filename)
 		{
-			// string smfPath = @"らーめん食べよう.mid";
-			string smfPath = @"3分間のトキメキ.mid";
+			string smfPath = filename;
 			MidiWatcher midiWatcher = new MidiWatcher();
 			midiWatcher.onMidiIn += MIDIIn;
 			midiWatcher.onLyricIn += LyricIn;
@@ -36,11 +49,9 @@ namespace Test
 				Task.Delay(100);
 			}
 		}
-		void MapCreator()
+		void MapCreator(string filename)
 		{
-			Console.WriteLine("Hello, World!");
-			// string smfPath = @"らーめん食べよう.mid";
-			string smfPath = @"3分間のトキメキ.mid";
+			string smfPath = filename;
 			MIDIEventMap map = new MIDIEventMap();
 			SMFPlayer smfPlayer = new SMFPlayer(smfPath, map);
 			map.Init(smfPlayer);
@@ -68,7 +79,7 @@ namespace Test
 			}
 			Console.WriteLine("-----------------------------------------");
 			Console.WriteLine("each measure");
-			Console.WriteLine("measure, lyrics, time, position");
+			Console.WriteLine("measure, time, lyrics");
 			for (var meas = 0; meas < numOfMeasure; meas++) {
 				UInt32 msec = 0;
 				for (var track = 0; track < numOfTrack; track++) {
