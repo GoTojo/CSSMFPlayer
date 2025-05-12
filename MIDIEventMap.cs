@@ -99,15 +99,11 @@ public class MIDIEventMap : MIDIHandler
 	}
 	public LyricData GetLyricData(int measure, int track, int num)
 	{
-		if (measure < lyrics.Count) {
-			if (track < lyrics[measure].Count) {
-				if (num < lyrics[measure][track].Count) {
-					return lyrics[measure][track][num];
-				}
-			}
+		if (!DataExist(measure, track, num)) {
+			LyricData data = new LyricData();
+			return data;
 		}
-		LyricData data = new LyricData();
-		return data;
+		return lyrics[measure][track][num];
 	}
 	public string GetLyric(int measure, int track, int num)
 	{
