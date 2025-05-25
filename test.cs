@@ -31,7 +31,7 @@ namespace Test
 		void LyricPlayer(string filename)
 		{
 			string smfPath = filename;
-			MidiWatcher midiWatcher = new MidiWatcher();
+			MidiWatcher midiWatcher = MidiWatcher.Instance;
 			midiWatcher.onMidiIn += MIDIIn;
 			midiWatcher.onLyricIn += LyricIn;
 			midiWatcher.onTempoIn += TempoIn;
