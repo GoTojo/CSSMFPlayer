@@ -29,6 +29,7 @@ public class MidiWatcher : MIDIHandler
 	public event tempoInHandler? 	onTempoIn;
 	public event beatInHandler? 		onBeatIn;
 	public event measureInHandler? 	onMeasureIn;
+	public event eventInHandler? 	onEventIn;
 
 	private MidiWatcher()
 	{
@@ -66,5 +67,10 @@ public class MidiWatcher : MIDIHandler
 	{
 		// Console.WriteLine($"MeasureIn: Measure: {measure}, Interval: {measureInterval}");
 		onMeasureIn?.Invoke(measure, measureInterval, currentMsec);
+	}
+	public override void EventIn(MIDIHandler.Event playerEvent)
+	{
+		// Console.WriteLine($"EventIn: Event: {PlayerEvent}");
+		onEventIn?.Invoke(playerEvent);
 	}
 }

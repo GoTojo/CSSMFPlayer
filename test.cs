@@ -12,19 +12,27 @@ namespace Test
 		{
 			string mode = "p";
 			string filename = "";
-			if (args.Count() == 0) {
+			if (args.Count() == 0)
+			{
 				Console.WriteLine("usage: test p|m filename");
 				return;
-			} else if (args.Count() == 1) {
+			}
+			else if (args.Count() == 1)
+			{
 				filename = args[0];
-			} else {
+			}
+			else
+			{
 				mode = args[0];
 				filename = args[1];
 			}
 			Test test = new Test();
-			if (mode == "m") {
+			if (mode == "m")
+			{
 				test.MapCreator(filename);
-			} else {
+			}
+			else
+			{
 				test.LyricPlayer(filename);
 			}
 		}
@@ -37,15 +45,19 @@ namespace Test
 			midiWatcher.onTempoIn += TempoIn;
 			midiWatcher.onBeatIn += BeatIn;
 			midiWatcher.onMeasureIn += MeasureIn;
+			midiWatcher.onEventIn += EventIn;
 			SMFPlayer smfPlayer = new SMFPlayer(smfPath, midiWatcher);
 			smfPlayer.Start();
 			Task.Run(() =>
 			{
-				while(smfPlayer.Update()) {
+				while (smfPlayer.Update())
+				{
 					Task.Delay(100);
-				} ;
+				}
+				;
 			});
-			while (smfPlayer.isPlaying()) {
+			while (smfPlayer.isPlaying())
+			{
 				Task.Delay(100);
 			}
 		}
@@ -60,15 +72,19 @@ namespace Test
 			Console.WriteLine($"numOfTrack: {numOfTrack}");
 			Console.WriteLine("each lyrics");
 			Console.Write("measure");
-			for (var track = 0; track < numOfTrack; track++) {
+			for (var track = 0; track < numOfTrack; track++)
+			{
 				Console.Write(", lyric, time, position");
 			}
 			Console.WriteLine();
-			for (var meas = 0; meas < numOfMeasure; meas++) {
+			for (var meas = 0; meas < numOfMeasure; meas++)
+			{
 				Console.Write($"{meas}");
-				for (var track = 0; track < numOfTrack; track++) {
+				for (var track = 0; track < numOfTrack; track++)
+				{
 					var numOfLyric = map.GetNumOfLyrics(meas, track);
-					for (var i = 0; i < numOfLyric; i++) {
+					for (var i = 0; i < numOfLyric; i++)
+					{
 						string lyric = map.GetLyric(meas, track, i);
 						UInt32 msec = map.GetMsec(meas, track, i);
 						float position = map.GetPosition(meas, track, i);
@@ -80,18 +96,22 @@ namespace Test
 			Console.WriteLine("-----------------------------------------");
 			Console.WriteLine("each measure");
 			Console.WriteLine("measure, time, lyrics");
-			for (var meas = 0; meas < numOfMeasure; meas++) {
+			for (var meas = 0; meas < numOfMeasure; meas++)
+			{
 				UInt32 msec = 0;
-				for (var track = 0; track < numOfTrack; track++) {
+				for (var track = 0; track < numOfTrack; track++)
+				{
 					if (!map.DataExist(meas, track, 0)) continue;
 					msec = map.GetMsec(meas, track, 0);
 					break;
 				}
 				Console.Write($"{meas}, {msec}");
-				for (var track = 0; track < numOfTrack; track++) {
+				for (var track = 0; track < numOfTrack; track++)
+				{
 					var numOfLyric = map.GetNumOfLyrics(meas, track);
 					string sentence = "";
-					for (var i = 0; i < numOfLyric; i++) {
+					for (var i = 0; i < numOfLyric; i++)
+					{
 						string lyric = map.GetLyric(meas, track, i);
 						sentence += lyric;
 					}
@@ -120,6 +140,27 @@ namespace Test
 		public void MeasureIn(int num, int measureInterval, UInt32 currentMsec)
 		{
 			Console.WriteLine($"Measure: {num}, Interval: {measureInterval}, currentMsec: {currentMsec}");
+		}
+		public void EventIn(MIDIHandler.Event playerEvent)
+		{
+			string eventName = "";
+			switch (playerEvent) {
+			case MIDIHandler.Event.Start:
+				eventName = "Start";
+				break;
+			case MIDIHandler.Event.Stop:
+				eventName = "Stop";
+				break;
+			case MIDIHandler.Event.Reset:
+				eventName = "Reset";
+				break;
+			case MIDIHandler.Event.End:
+				eventName = "End";
+				break;
+			default:
+				break;
+			}
+			Console.WriteLine($"Event:{eventName}");
 		}
 	}
 }

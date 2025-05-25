@@ -25,6 +25,7 @@ public class SMFPlayer
 	private List<TrackPlayer> players = new List<TrackPlayer>();
 	private MIDIHandler? midiHandler;
 	private bool playing = false;
+	private bool isEnd = false;
 	public struct Beat
 	{
 		public int unit;
@@ -32,20 +33,20 @@ public class SMFPlayer
 	};
 	public Beat beat;
 	public int numOfMeasure = 0;
+	public int numOfTrack = 0;
 	private Stopwatch stopWatch = new Stopwatch();
 	private UInt32 nextEventTime = 0;
 	private UInt32 startTime = 0;
 	private UInt32 lastMeasTime = 0;
 	public int GetNumOfTrack()
 	{
-		return tracks.Count() - 1;
+		return numOfTrack;
 	}
 
 	public static UInt32 BEReader(BinaryReader reader, int len)
 	{
 		UInt32 value = 0;
-		for (int i = 0; i < len; i++)
-		{
+		for (int i = 0; i < len; i++) {
 			byte data = reader.ReadByte();
 			value <<= 8;
 			value += data;
@@ -64,6 +65,8 @@ public class SMFPlayer
 		}
 		midiHandler = _midiHandler ?? throw new ArgumentNullException(nameof(_midiHandler));
 		isValid = true;
+		playing = false;
+		isEnd = false;
 		tracks.Clear();
 		players.Clear();
 		// Console.WriteLine("Loading SMF: " + filepath);
@@ -72,11 +75,13 @@ public class SMFPlayer
 		{
 			BinaryReader reader = new BinaryReader(fs);
 			isValid = ParseChunk(reader);
-			foreach (TrackData track in tracks) {
+			foreach (TrackData track in tracks)
+			{
 				TrackPlayer player = new TrackPlayer(track, this);
 				players.Add(player);
 			}
 		}
+		numOfTrack = tracks.Count;
 		// Console.WriteLine("complete parsing SMF");
 	}
 	public void Reset()
@@ -86,14 +91,18 @@ public class SMFPlayer
 		nextEventTime = 0;
 		startTime = 0;
 		lastMeasTime = 0;
+		isEnd = false;
 		foreach (TrackPlayer player in players){
 			player.Reset();
 		}
+		midiHandler?.EventIn(MIDIHandler.Event.Reset);
 	}
-	public bool isPlaying() {
+	public bool isPlaying()
+	{
 		return this.playing;
 	}
-	private UInt32 tickup() {
+	private UInt32 tickup()
+	{
 		UInt32 nexttime = UInt32.MaxValue;
 		foreach (TrackPlayer player in players) {
 			if (player.isEnd) {
@@ -104,17 +113,18 @@ public class SMFPlayer
 				nexttime = _nexttime;
 			}
 		}
+		isEnd = true;
 		return nexttime;
 	}
 
 	public bool Start(int _startTime = -1)
 	{
 		// Console.WriteLine("Play Start");
-		if (!isValid)
-		{
+		if (!isValid) {
 			return false;
 		}
 		playing = true;
+		midiHandler?.EventIn(MIDIHandler.Event.Start);
 		Reset();
 		stopWatch.Start();
 		if (_startTime < 0) {
@@ -123,8 +133,7 @@ public class SMFPlayer
 			startTime = (UInt32)_startTime;
 		}
 		UInt32 nexttime = tickup();
-		if (nexttime == UInt32.MaxValue)
-		{
+		if (nexttime == UInt32.MaxValue) {
 			playing = false;
 		}
 		UInt32 nextEventTime = nexttime + startTime;
@@ -134,16 +143,17 @@ public class SMFPlayer
 
 	public bool Update(UInt32 currentTime = 0)
 	{
+		if (playing == false) {
+			return false;
+		}
 		if (currentTime == 0) {
 			currentTime = (UInt32)stopWatch.ElapsedMilliseconds;
 		}
 		// Console.WriteLine($"currentTime: {currentTime}");
-		while (currentTime >= nextEventTime)
-		{
+		while (currentTime >= nextEventTime) {
 			UInt32 nexttime = tickup();
-			if (nexttime == UInt32.MaxValue)
-			{
-				playing = false;
+			if (nexttime == UInt32.MaxValue) {
+				Stop();
 				break;
 			}
 			nextEventTime = nexttime + startTime;
@@ -159,6 +169,7 @@ public class SMFPlayer
 		}
 		stopWatch.Stop();
 		playing = false;
+		midiHandler?.EventIn(isEnd ? MIDIHandler.Event.End : MIDIHandler.Event.Stop);
 		return true;
 	}
 
@@ -209,7 +220,7 @@ public class SMFPlayer
 		BeatTrack beatTrack = new BeatTrack(trackid, tracks, this);
 		tracks.Insert(0, beatTrack);
 		numOfMeasure = beatTrack.numOfMeasure;
-		Console.WriteLine($"numOfMeasure: {numOfMeasure}");
+		// Console.WriteLine($"numOfMeasure: {numOfMeasure}");
 		trackid++;
 		return true;
 	}
@@ -284,14 +295,14 @@ public class SMFPlayer
 		}
 		public UInt32 GetDeltaTime()
 		{
-			if (midiEvents.Count() <= currentEventIndex) {
+			if (midiEvents.Count <= currentEventIndex) {
 				return UInt32.MaxValue;
 			}
 			return midiEvents[(int)currentEventIndex].deltaTime;
 		}
 		public byte[] GetData()
 		{
-			if (midiEvents.Count() <= currentEventIndex) {
+			if (midiEvents.Count <= currentEventIndex) {
 				byte[] dummy = new byte[0];
 				return dummy;
 			}
@@ -299,7 +310,7 @@ public class SMFPlayer
 		}
 		public UInt32 GetMsec()
 		{
-			if (midiEvents.Count() <= currentEventIndex) {
+			if (midiEvents.Count <= currentEventIndex) {
 				return UInt32.MaxValue;
 			}
 			return midiEvents[(int)currentEventIndex].msec;
@@ -505,12 +516,12 @@ public class SMFPlayer
 		public BeatTrack(int id, List<TrackData> trackData, SMFPlayer player):base(id, player) {
 			this.player = player;
 			UInt32 currentTick = 0;
-			UInt32 [] nextEventTick = new UInt32 [trackData.Count()];
+			UInt32 [] nextEventTick = new UInt32 [trackData.Count];
 			beat.unit = 4;
 			beat.count = 4;
 			ticksForBeat = (int)player.tpqn * 4 / 4;
 			ticksForMeasure = ticksForBeat * 4;
-			for (int i = 0; i < trackData.Count(); i++) {
+			for (int i = 0; i < trackData.Count; i++) {
 				trackData[i].Reset();
 				nextEventTick[i] = trackData[i].GetDeltaTime();
 			}
@@ -519,7 +530,7 @@ public class SMFPlayer
 			bool allIsEnd = true;
 			do {
 				allIsEnd = true;
-				for (int i = 0; i < trackData.Count(); i++) {
+				for (int i = 0; i < trackData.Count; i++) {
 					if (trackData[i].IsEnd()) {
 						continue;
 					}
@@ -612,7 +623,7 @@ public class SMFPlayer
 			switch (data[0]) {
 			case typeBeat:
 				if (!player.mute) {
-					player.midiHandler?.BeatIn(data[1] + 1, beat.unit, GetMsec());
+					player.midiHandler?.BeatIn(data[1], beat.unit, GetMsec());
 				}
 				currentBeat++;
 				if (currentBeat >= beat.count) {
@@ -622,12 +633,12 @@ public class SMFPlayer
 			case typeMeasure:
 				player.lastMeasTime = GetMsec();
 				if (!player.mute) {
-					player.midiHandler?.MeasureIn(data[1] + 1, (int)player.GetMsecForMeasure(), GetMsec());
+					player.midiHandler?.MeasureIn(data[1], (int)player.GetMsecForMeasure(), GetMsec());
 				}
 				currentMeasure++;
 				break;
 			case typeTimeSignature:
-				if (data.Count() > 3) {
+				if (data.Length > 3) {
 					beat.unit = data[1];
 					beat.count = data[2];
 				}
